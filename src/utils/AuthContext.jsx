@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         }
       
         try {
-          const userId = 'unique()'; 
+          const userId = "unique()"; 
           console.log("Registering with ID:", userId, "Length:", userId.length);
           
           const response = await account.create(
