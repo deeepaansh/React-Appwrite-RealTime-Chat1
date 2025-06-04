@@ -1,99 +1,118 @@
+// src/utils/AuthContext.jsx
+
 import { createContext, useState, useEffect, useContext } from "react";
-import { account } from "../appwriteConfig";
+import { account, IDtool as ID } from "../appwriteConfig"; // ← import from appwriteConfig.js
 import { useNavigate } from "react-router";
-import { ID } from "appwrite";
 
 const AuthContext = createContext();
+
 export const AuthProvider = ({ children }) => {
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState(null);
-    const navigate = useNavigate();
+  const [loading, setLoading]          = useState(true);
+  const [user, setUser]                = useState(null);
+  const [isRegistering, setRegistering] = useState(false);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        getUserOnLoad();
-    }, []);
+  useEffect(() => {
+    getUserOnLoad();
+  }, []);
 
-    const getUserOnLoad = async () => {
-        try {
-            let accountDetails = await account.get();
-            setUser(accountDetails);
-        } catch (error) {}
-        setLoading(false);
-    };
+  const getUserOnLoad = async () => {
+    try {
+      const accountDetails = await account.get();
+      setUser(accountDetails);
+    } catch {
+      // ignore if no session
+    }
+    setLoading(false);
+  };
 
-    const handleUserLogin = async (e, credentials) => {
-        e.preventDefault();
-        console.log("CREDS:", credentials);
+  const handleRegister = async (e, credentials) => {
+    e.preventDefault();
 
-        try {
-            let response = await account.createSession(
-                credentials.email,
-                credentials.password
-            );
-            let accountDetails = await account.get();
-            setUser(accountDetails);
-            navigate("/");
-        } catch (error) {
-            console.error(error);
-        }
-    };
+    // 🔍 Basic client-side validation:
+    if (!credentials.email.includes("@")) {
+      alert("Please enter a valid email.");
+      return;
+    }
+    if (credentials.password1.length < 8) {
+      alert("Password must be at least 8 characters.");
+      return;
+    }
+    if (credentials.password1 !== credentials.password2) {
+      alert("Passwords do not match!");
+      return;
+    }
 
-    const handleLogout = async () => {
-        const response = await account.deleteSession("current");
-        setUser(null);
-    };
+    setRegistering(true);
+    try {
+      // 🎯 Generate a valid userId (≤36 chars, valid chars):
+      const userId = ID.unique();
+      console.log("Registering with ID:", userId, "Length:", userId.length);
 
-    const handleRegister = async (e, credentials) => {
-        e.preventDefault();
-      
-        if (credentials.password1 !== credentials.password2) {
-          alert("Passwords did not match!");
-          return;
-        }
-      
-        try {
-          const userId = "unique()"; 
-          console.log("Registering with ID:", userId, "Length:", userId.length);
-          
-          const response = await account.create(
-            userId,
-            credentials.email,
-            credentials.password1,
-            credentials.name
-          );
-      
-          await account.createSession(credentials.email, credentials.password1);
-          const accountDetails = await account.get();
-          setUser(accountDetails);
-          navigate("/");
-        } catch (error) {
-          console.error("Registration Error:", error);
-          if (error.code === 409) {
-            alert("User with this email already exists. Please login.");
-          } else {
-            alert("Something went wrong during registration.");
-          }
-        }
-      };
-      
-      
+      // 🔑 Create the new user account
+      await account.create(
+        userId,
+        credentials.email,
+        credentials.password1,
+        credentials.name
+      );
 
-    const contextData = {
+      // ✅ Immediately create a session (log in the new user)
+      await account.createSession(credentials.email, credentials.password1);
+
+      const accountDetails = await account.get();
+      setUser(accountDetails);
+      navigate("/");
+    } catch (error) {
+      console.error("Registration Error:", error);
+      if (error.code === 409) {
+        alert("A user with this email already exists. Please login.");
+      } else if (
+        error.message &&
+        error.message.toLowerCase().includes("password")
+      ) {
+        alert(
+          "Invalid password: must be 8–265 characters long and not too common."
+        );
+      } else {
+        alert("Something went wrong during registration.");
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleUserLogin = async (e, credentials) => {
+    e.preventDefault();
+    try {
+      await account.createSession(credentials.email, credentials.password);
+      const accountDetails = await account.get();
+      setUser(accountDetails);
+      navigate("/");
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert("Login failed: " + (error.message || "Please try again."));
+    }
+  };
+
+  const handleLogout = async () => {
+    await account.deleteSession("current");
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
         user,
+        handleRegister,
         handleUserLogin,
         handleLogout,
-        handleRegister,
-    };
-
-    return (
-        <AuthContext.Provider value={contextData}>
-            {loading ? <p>Loading...</p> : children}
-        </AuthContext.Provider>
-    );
+      }}
+    >
+      {loading ? <p>Loading...</p> : children}
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => {
-    return useContext(AuthContext);
-};
-
+export const useAuth = () => useContext(AuthContext);
 export default AuthContext;
