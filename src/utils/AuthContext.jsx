@@ -4,6 +4,7 @@ import { createContext, useState, useEffect, useContext } from "react";
 import { account, IDtool as ID } from "../appwriteConfig"; // ← import from appwriteConfig.js
 import { useNavigate } from "react-router";
 
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -19,12 +20,15 @@ export const AuthProvider = ({ children }) => {
   const getUserOnLoad = async () => {
     try {
       const accountDetails = await account.get();
+      console.log("User details:", accountDetails);
       setUser(accountDetails);
-    } catch {
-      // ignore if no session
+    } catch (error) {
+      console.error("account.get() failed:", error);
+      // error.code === 401 means “no active session”
     }
     setLoading(false);
   };
+  
 
   const handleRegister = async (e, credentials) => {
     e.preventDefault();
@@ -58,7 +62,7 @@ export const AuthProvider = ({ children }) => {
       );
 
       // ✅ Immediately create a session (log in the new user)
-      await account.createSession(credentials.email, credentials.password1);
+      await account.createEmailPasswordSession(credentials.email, credentials.password1);;
 
       const accountDetails = await account.get();
       setUser(accountDetails);
@@ -85,7 +89,7 @@ export const AuthProvider = ({ children }) => {
   const handleUserLogin = async (e, credentials) => {
     e.preventDefault();
     try {
-      await account.createSession(credentials.email, credentials.password);
+      await account.createEmailPasswordSession(credentials.email, credentials.password);;
       const accountDetails = await account.get();
       setUser(accountDetails);
       navigate("/");
