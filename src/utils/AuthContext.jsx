@@ -52,27 +52,30 @@ export const AuthProvider = ({ children }) => {
         }
       
         try {
+          const userId = 'unique()'; 
+          console.log("Registering with ID:", userId, "Length:", userId.length);
+          
           const response = await account.create(
-            ID.unique(),
+            userId,
             credentials.email,
             credentials.password1,
             credentials.name
           );
-          console.log("User registered!", response);
       
           await account.createSession(credentials.email, credentials.password1);
-          let accountDetails = await account.get();
+          const accountDetails = await account.get();
           setUser(accountDetails);
           navigate("/");
         } catch (error) {
+          console.error("Registration Error:", error);
           if (error.code === 409) {
             alert("User with this email already exists. Please login.");
           } else {
-            console.error(error);
             alert("Something went wrong during registration.");
           }
         }
       };
+      
       
 
     const contextData = {
